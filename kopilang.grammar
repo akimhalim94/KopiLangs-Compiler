@@ -1,0 +1,129 @@
+Package kopilang;
+
+Helpers
+    letter = ['a'..'z'] | ['A'..'Z'];
+    digit = ['0'..'9'];
+    cr = 13;
+    lf = 10;
+    tab = 9;
+    space_char = ' ' | tab | cr | lf;
+    all_chars = [0..0xffff];
+    non_star = [all_chars - '*'];
+    non_star_slash = [non_star - '/'];
+
+Tokens
+    // Whitespaces & Comments
+    blank = space_char+;
+    comment1 = '//' [all_chars - [cr + lf]]* (cr | lf | cr lf)?;
+    comment2 = '/*' non_star* '*'+ (non_star_slash non_star* '*'+)* '/';
+
+    // Keywords (Malay | Spanish | Tagalog | Korean)
+    class_kw = 'kelas' | 'clase' | 'klase' | 'keullaeseu';
+    public_kw = 'awam' | 'publico' | 'publiko' | 'gonggae';
+    static_kw = 'tetap' | 'estatico' | 'estatiko' | 'jeongjeok';
+    void_kw = 'kosong' | 'vacio' | 'wala' | 'bin';
+    main_kw = 'utama' | 'principal' | 'pangunahin' | 'mein';
+    string_kw = 'teks' | 'cadena' | 'teksto' | 'munjayeol';
+    int_type = 'nombor' | 'entero' | 'numero' | 'jeongsu';
+    float_type = 'pecahan' | 'flotante' | 'lutang' | 'silsu';
+
+    // Logic & Control Flow Keywords
+    do_kw = 'buat' | 'hacer' | 'gawin' | 'hada';
+    while_kw = 'semasa' | 'mientras' | 'habang' | 'dongan';
+    for_kw = 'untuk' | 'para' | 'wihae';
+    if_kw = 'jika' | 'si' | 'kung' | 'manyag';
+    else_kw = 'lain' | 'sino' | 'kundi' | 'animyeon';
+
+    // Structural Symbols
+    l_brace = '{';
+    r_brace = '}';
+    l_paren = '(';
+    r_paren = ')';
+    l_bracket = '[';
+    r_bracket = ']';
+    semi = ';';
+    comma = ',';
+    assign = '=';
+
+    // Mathematical & Comparison Operators
+    plus = '+';
+    minus = '-';
+    mult = '*';
+    div = '/';
+    lteq = '<=';
+    lt = '<';
+    gteq = '>=';
+    gt = '>';
+    eq = '==';
+
+    // Identifiers & Values
+    id = letter (letter | digit)*;
+    float_val = digit+ '.' digit+;
+    int_val = digit+;
+
+Ignored Tokens
+    blank, comment1, comment2;
+
+Productions
+    // 1. Main Program Structure
+    program = class_kw [class_name]:id [l_brace1]:l_brace public_kw static_kw void_kw main_kw l_paren string_kw l_bracket r_bracket [args_name]:id r_paren [l_brace2]:l_brace statements [r_brace1]:r_brace [r_brace2]:r_brace;
+
+    statements = statement*;
+
+    // 2. Separation of Matched & Unmatched (Resolving Dangling Else Shift/Reduce)
+    statement = 
+        {matched} matched_stmt |
+        {unmatched} unmatched_stmt;
+
+    matched_stmt = 
+        {declaration} var_type id_list semi |
+        {assignment} id assign expr semi |
+        {block} l_brace statements r_brace |
+        {dowhile} do_kw statement while_kw l_paren expr r_paren semi |
+        {for} for_kw l_paren [init]:id [assign1]:assign [init_expr]:expr [semi1]:semi [cond]:expr [semi2]:semi [step]:id [assign2]:assign [step_expr]:expr r_paren matched_stmt |
+        {while} while_kw l_paren expr r_paren matched_stmt |
+        {ifelse} if_kw l_paren expr r_paren [if_stmt]:matched_stmt else_kw [else_stmt]:matched_stmt;
+
+    unmatched_stmt = 
+        {if} if_kw l_paren expr r_paren statement |
+        {ifelse} if_kw l_paren expr r_paren [if_stmt]:matched_stmt else_kw [else_stmt]:unmatched_stmt |
+        {for} for_kw l_paren [init]:id [assign1]:assign [init_expr]:expr [semi1]:semi [cond]:expr [semi2]:semi [step]:id [assign2]:assign [step_expr]:expr r_paren unmatched_stmt |
+        {while} while_kw l_paren expr r_paren unmatched_stmt;
+
+    // 3. Types & Declarations
+    var_type = 
+        {int} int_type | 
+        {float} float_type;
+
+    id_list = 
+        {single} id | 
+        {multi} id_list comma id;
+
+    // 4. Logic/Comparison Operations Hierarchy
+    expr = 
+        {lt} expr lt logic_term |
+        {lteq} expr lteq logic_term |
+        {gt} expr gt logic_term |
+        {gteq} expr gteq logic_term |
+        {eq} expr eq logic_term |
+        {logic_term} logic_term;
+
+    // 5. Mathematical Operations Hierarchy (Addition & Subtraction)
+    logic_term =
+        {plus} logic_term plus term |
+        {minus} logic_term minus term |
+        {term} term;
+
+    // 6. Mathematical Operations Hierarchy (Multiplication & Division)
+    term = 
+        {mult} term mult factor |
+        {div} term div factor |
+        {factor} factor;
+
+    // 7. Base Values (Including Negative Numbers & Parentheses)
+    factor = 
+        {id} id |
+        {int} int_val |
+        {float} float_val |
+        {neg_int} minus int_val |
+        {parens} l_paren expr r_paren;
